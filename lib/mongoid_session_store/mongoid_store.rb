@@ -5,7 +5,7 @@ module ActionDispatch
       class Session
         include Mongoid::Document
         
-        store_in :sessions
+        store_in collection: 'sessions'
 
         identity :type => String
 
