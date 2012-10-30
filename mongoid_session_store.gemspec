@@ -1,5 +1,5 @@
 Gem::Specification.new do |s|
-  s.name = "mongoid3_session_store"
+  s.name = "mongoid_session_store"
   s.version = "3.0.0"
   s.authors     = ["Ryan Fitzgerald, Dimitri Kurashvili", "Code Brew Studios, C12.ge"]
   s.email       = ["ryan@codebrewstudios.com, dimitri@c12.ge"]
