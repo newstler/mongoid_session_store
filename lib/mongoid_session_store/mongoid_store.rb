@@ -11,6 +11,7 @@ module ActionDispatch
         field :id, type: String
         attr_accessible :id
         field :data, :type => String, :default => [Marshal.dump({})].pack("m*")
+        field :last_active_time, type: Time, default: Time.now
       end
 
       # The class used for session storage.
@@ -23,14 +24,23 @@ module ActionDispatch
       private
 
         def get_session(env, sid)
+          expire_after = env[ENV_SESSION_OPTIONS_KEY][:expire_after]
           sid ||= generate_sid
           session = find_session(sid)
+          seconds_since_last_access = Time.now - session.last_active_time.to_time
+          if expire_after and seconds_since_last_access > expire_after
+            # clear all the existing data
+            session.data = [Marshal.dump({})].pack("m*")
+            session.save
+          end
+          
           env[SESSION_RECORD_KEY] = session
           [sid, unpack(session.data)]
         end
 
         def set_session(env, sid, session_data, options = nil)
           record = get_session_model(env, sid)
+          record.last_active_time = Time.now
           record.data = pack(session_data)
 
           # Rack spec dictates that set_session should return true or false

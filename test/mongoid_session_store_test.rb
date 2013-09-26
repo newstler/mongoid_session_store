@@ -1,8 +1,28 @@
 require 'test_helper'
 
+# Redefine the '[]' method to return a stubbed value for expire_after key, if it is set
+# in a Fiber-local variable
+module OptionsHashStub
+  def [](key)
+    if key.to_s == 'expire_after' and !Thread.current["expire_after"].blank?
+      Thread.current["expire_after"]
+    else
+      super
+    end
+  end
+end
+
+# This forces Rack::Session::Abstract::Options hash to use the method we defined above
+# instead of the actual implementation.  the 'super' call in the OptionsHashStub
+# implementation will delegate to the original definition of the method
+class Rack::Session::Abstract::OptionsHash < Hash 
+  prepend OptionsHashStub 
+end
+
 class MongoidSessionStoreTest < ActionDispatch::IntegrationTest
   setup do
     ActionDispatch::Session::MongoidStore::Session.destroy_all
+    Thread.current["expire_after"] = nil # Keep this variable nil'ed out unless explicitly set otherwise
   end
         
   test "getting nil session value" do
@@ -101,6 +121,51 @@ class MongoidSessionStoreTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_equal 'foo: nil', response.body
     assert_not_equal session_id, cookies['_session_id']
+  end
+  
+  test "session data is accessible before session expiry" do
+    # set session to expire 120 seconds since last active
+    Thread.current["expire_after"] = 120.seconds
+    
+    get '/set_session_value'
+    assert_response :success
+    assert cookies['_session_id']
+    
+    get '/get_session_value'
+    assert_response :success
+    assert_equal 'foo: "bar"', response.body
+    session_id = cookies['_session_id']
+    assert session_id
+    
+    sleep 1
+    
+    get '/get_session_value', :_session_id => session_id
+    assert_response :success
+    assert_equal 'foo: "bar"', response.body
+    assert_equal session_id, cookies['_session_id']
+  end
+
+  test "session data is not accessible after session expiry" do
+    # set session to expire 1 seconds since last active
+    Thread.current["expire_after"] = 1.seconds
+    
+    get '/set_session_value'
+    assert_response :success
+    assert cookies['_session_id']
+    session_id = cookies['_session_id']
+    
+    get '/get_session_value'
+    assert_response :success
+    assert_equal 'foo: "bar"', response.body
+    session_id = cookies['_session_id']
+    assert session_id
+    
+    sleep 1
+    
+    get '/get_session_value', :_session_id => session_id
+    assert_response :success
+    assert_equal 'foo: nil', response.body
+    assert_equal session_id, cookies['_session_id']  
   end
    
 end
