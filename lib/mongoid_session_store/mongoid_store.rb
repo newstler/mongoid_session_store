@@ -9,7 +9,7 @@ module ActionDispatch
 
         #identity :type => String
         field :id, type: String
-        attr_accessible :id
+        #attr_accessible :id
         field :data, :type => String, :default => [Marshal.dump({})].pack("m*")
         field :last_active_time, type: Time, default: Time.now
       end
